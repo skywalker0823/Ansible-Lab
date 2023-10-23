@@ -1,0 +1,1 @@
+* ansible GCP_VM -m ping -i hosts.ini  

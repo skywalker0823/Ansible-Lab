@@ -1,0 +1,67 @@
+---
+- name: Create-SSL
+  hosts: "{{ host|default('localhost') }}"
+  become: true
+  tasks:
+    - name: Add PPA repositories
+      ansible.builtin.apt_repository:
+        repo: "{{ item.repo }}"
+      with_items:
+        - { repo: "ppa:certbot/certbot" }
+      when: ansible_distribution == 'Ubuntu' and ansible_distribution_release != 'focal'
+
+    - name: Install Certbot
+      ansible.builtin.apt:
+        pkg: "{{ item }}"
+        state: present
+        update_cache: true
+      with_items:
+        - certbot
+        - python3-certbot-nginx
+
+    - name: Create directory for {{ domain }}
+      ansible.builtin.file:
+        state: directory
+        path: /var/www/{{ domain }}/html
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0700"
+
+    - name: Add HTTP version of {{ domain }}
+      ansible.builtin.template:
+        src: ./templates/http-domain.j2
+        dest: /etc/nginx/sites-available/{{ domain }}.conf
+        mode: "0700"
+
+    - name: Create symbolic link for HTTP version of {{ domain }}
+      ansible.builtin.file:
+        state: link
+        src: /etc/nginx/sites-available/{{ domain }}.conf
+        dest: /etc/nginx/sites-enabled/{{ domain }}.conf
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0700"
+      notify:
+        - reload_nginx
+
+    - name: Dry run before create SSL certificate for {{ domain }}
+      ansible.builtin.command: certbot --nginx certonly --agree-tos -m {{ email }} -d {{ domain }} -d www.{{ domain }} --dry-run
+      changed_when: false
+
+    - name: Create SSL certificate for {{ domain }}
+      ansible.builtin.command: certbot --nginx certonly --agree-tos -m {{ email }} -d {{ domain }} -d www.{{ domain }}
+      changed_when: false
+
+    - name: Add HTTPS version of {{ domain }}
+      ansible.builtin.template:
+        src: ./templates/https-domain.j2
+        dest: /etc/nginx/sites-available/{{ domain }}.conf
+        mode: "0700"
+      notify:
+        - reload_nginx
+
+  handlers:
+    - name: Reload_nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded

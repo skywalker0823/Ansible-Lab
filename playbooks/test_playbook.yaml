@@ -1,0 +1,52 @@
+---
+- name: Test some ansible modules
+  hosts: GCP_VM
+  tasks:
+    - name: Check remote connectivity
+    # 本指令是測試遠端主機是否能夠連線
+      ansible.builtin.ping:
+    - name: Install docker
+    # 本指令是安裝docker, 若已安裝則不會執行
+      ansible.builtin.apt:
+        name: docker.io
+        state: present
+    - name: Run docker
+    # 本指令是啟動docker, 若已啟動則不會執行
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+    - name: Run hello-world
+    # 本指令是執行docker hello-world
+      ansible.builtin.command: docker run hello-world
+      changed_when: false
+    - name: Create a directory
+      ansible.builtin.file:
+        path: /tmp/ansible_test
+        state: directory
+        mode: "0755"
+    - name: Write down time
+      ansible.builtin.lineinfile:
+        path: /tmp/ansible_test/time.txt
+        line: "{{ lookup('pipe', 'date') }}"
+        create: true
+        mode: "0755"
+    - name: Get docker status
+      ansible.builtin.command: docker ps -a
+      register: docker_status
+      changed_when: false
+    - name: Print docker status
+      ansible.builtin.debug:
+        msg: "{{ docker_status.stdout_lines }}"
+    - name: Copy local file to remote
+    # 本指令是範本地檔案複製到遠端, 若沒資料夾將回傳錯誤
+      ansible.builtin.copy:
+        src: ~/Desktop/Ansible/XD.txt
+        dest: /tmp/test/XD_remote.txt
+        mode: "0755"
+    - name: Copy remote file to local
+    # 本指令是範遠端檔案複製到本地, 且會直接覆蓋本地檔案
+      ansible.builtin.fetch:
+        src: /tmp/ansible_test/time.txt
+        dest: ~/Desktop/Ansible/time.txt
+        flat: true

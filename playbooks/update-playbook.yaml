@@ -1,0 +1,21 @@
+---
+- name: Update website
+  hosts: GCP_VM
+  tasks:
+    - name: Update website
+      ansible.builtin.shell: |
+        cd /data/Nasa-APOD
+        git pull
+      register: git_pull
+      changed_when: git_pull.stdout != "Already up to date."
+    - name: Return hash if updated
+      ansible.builtin.debug:
+        msg: "{{ git_pull.stdout }}"
+      when: git_pull.stdout != "Already up to date."
+    - name: Get system loading
+      ansible.builtin.command: uptime
+      register: uptime
+      changed_when: false
+    - name: Print system loading
+      ansible.builtin.debug:
+        msg: "{{ uptime.stdout }}"
